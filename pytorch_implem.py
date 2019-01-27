@@ -52,20 +52,6 @@ def load_features(filenames):
     return features
 
 
-class MinMax(nn.Module):
-
-    def __init__(self, R):
-        super().__init__()
-        self.R = R
-    
-    def forward(self, x):
-        top, _ = torch.topk(x, R, sorted=True)
-        bottom, _ = torch.topk(x, R, largest=False, sorted=True)
-        res = torch.cat((top, bottom), dim=2)
-        #print(res)
-        return res
-
-
 if __name__ == "__main__":
 
     args = parser.parse_args()
@@ -118,14 +104,14 @@ if __name__ == "__main__":
 
     model = nn.Sequential(
         nn.Conv1d(2048, 1, 1,bias=False),
-        nn.Dropout(p=0.5),
+        #nn.Dropout(p=0.5),
         MinMax(R),
         nn.Linear(2 * R, 200,bias=False),
-        nn.Sigmoid(),
-        nn.Dropout(p=0.5),
+        nn.LeakyReLU(0.1),
+        #nn.Dropout(p=0.5),
         nn.Linear(200, 100,bias=False),
-        nn.Sigmoid(),
-        nn.Dropout(p=0.5),
+        nn.LeakyReLU(0.1),
+        #nn.Dropout(p=0.5),
         nn.Linear(100, 1,bias=False)
         #nn.Sigmoid()
     ).float()
@@ -134,15 +120,27 @@ if __name__ == "__main__":
         if isinstance(m, nn.Linear):
             nn.init.xavier_normal_(m.weight.data)
             #nn.init.constant_(m.bias.data, 0)
+            print("------------------------------------")
+            print(m)
+            print("weights min : " + str(m.weight.data.min().item()))
+            print("weights max : " + str(m.weight.data.max().item()))
+            print("weights mean : " + str(m.weight.data.mean().item()))
+            print("weights std : " + str(m.weight.data.std().item()))
+                
         if isinstance(m, nn.Conv1d):
             nn.init.xavier_normal_(m.weight.data)
+            print(m)
+            print("weights min : " + str(m.weight.data.min().item()))
+            print("weights max : " + str(m.weight.data.max().item()))
+            print("weights mean : " + str(m.weight.data.mean().item()))
+            print("weights std : " + str(m.weight.data.std().item()))
+            
             #nn.init.constant_(m.bias.data, 0)
 
     model.apply(init_layers)
-
+    
     torch.set_printoptions(precision=10)
 
-    
     #loss_func = nn.BCEWithLogitsLoss(pos_weight=pos_ratio)
     loss_func = nn.BCEWithLogitsLoss()
     
@@ -153,6 +151,12 @@ if __name__ == "__main__":
             {'params': params_others}
         ], lr=LEARNING_RATE)
     #opt = optim.Adam(model.parameters(), LEARNING_RATE)
+
+    # xb, yb = next(train_dataloader.__iter__())
+    # get_backward_metrics(model, loss_func, xb, yb)
+    # get_forward_metrics(model, xb)
+    # exit()
+        
 
     # print(list(model[2].parameters()))
     # exit()
@@ -172,26 +176,12 @@ if __name__ == "__main__":
             #     print(param.grad)
             #     exit()
             opt.step()
-            
         
-
+        # get_backward_metrics(model, loss, xb, yb)
+        # exit()
+        # get_forward_metrics(model, xb)
+        
         model.eval()
-
-        remove_handles = []
-
-        def apply_hook(m):
-            def forward_metrics(module, input, output):
-                print(type(module).__name__)
-                print(output)
-            if isinstance(m, (nn.Conv1d, nn.Linear, nn.Sigmoid)):
-                remove_handles.append(m.register_forward_hook(forward_metrics))
-
-        model.apply(apply_hook)
-        model(xb)
-
-        for rm_hook in remove_handles:
-            rm_hook.remove()
-
         with torch.no_grad():
             valid_loss = sum(loss_func(model(xb), yb) for xb, yb in valid_dataloader)
         

@@ -60,16 +60,16 @@ if __name__ == "__main__":
     # unique, counts = np.unique(labels_test, return_counts=True)
     # print(unique, counts, counts[1] / (counts[0] + counts[1]))
 
-    # test_pytorch = pd.read_csv(pytorch_filename)
-    # test_pytorch = test_pytorch["Target"].values
+    test_pytorch = pd.read_csv(pytorch_filename)
+    test_pytorch = test_pytorch["Target"].values
 
-    
-    # Get the filenames for train
-    filenames_train = [train_dir / "{}.npy".format(idx) for idx in train_output["ID"]]
-    for filename in filenames_train:
-        assert filename.is_file(), filename
+    pred_metrics(labels_test, test_pytorch)
+    # # Get the filenames for train
+    # filenames_train = [train_dir / "{}.npy".format(idx) for idx in train_output["ID"]]
+    # for filename in filenames_train:
+    #     assert filename.is_file(), filename
 
-    features_train = load_concat_tiles(filenames_train)
+    # features_train = load_concat_tiles(filenames_train)
 
     # print(features_train)
     # print(np.max(features_train))
