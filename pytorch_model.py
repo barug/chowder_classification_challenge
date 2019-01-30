@@ -6,6 +6,9 @@ from torch import optim
 from torch.utils.data import TensorDataset
 from torch.utils.data import DataLoader
 
+from pytorch_metrics import compute_weights_metrics, compute_forward_metrics, compute_backward_metrics
+
+from collections import OrderedDict
 torch.set_printoptions(precision=10)
 
 
@@ -31,22 +34,23 @@ class PytorchChowder:
         self.LR = lr
         self.MAX_TILES_NBR = mt
 
-        self.model = nn.Sequential(
-            nn.Conv1d(2048, 1, 1,bias=False),
-            nn.Dropout(p=0.5),
-            MinMax(self.R),
-            nn.Linear(2 * self.R, 200,bias=False),
-            nn.LeakyReLU(0.1),
-            nn.Dropout(p=0.5),
-            nn.Linear(200, 100,bias=False),
-            nn.LeakyReLU(0.1),
-            nn.Dropout(p=0.5),
-            nn.Linear(100, 1,bias=False)
+        self.model = nn.Sequential(OrderedDict([
+            ('conv', nn.Conv1d(2048, 1, 1,bias=False)),
+            ('drop1', nn.Dropout(p=0.5)),
+            ('minmax', MinMax(self.R)),
+            ('lin1', nn.Linear(2 * self.R, 200,bias=False)),
+            ('lrelu1', nn.LeakyReLU(0.1)),
+            ('drop2', nn.Dropout(p=0.5)),
+            ('lin2', nn.Linear(200, 100,bias=False)),
+            ('lrelu2', nn.LeakyReLU(0.1)),
+            ('drop3', nn.Dropout(p=0.5)),
+            ('lin3', nn.Linear(100, 1,bias=False))
             #nn.Sigmoid()
-        ).float()
+        ])).float()
 
         #loss_func = nn.BCEWithLogitsLoss(pos_weight=pos_ratio)
         self.loss_func = nn.BCEWithLogitsLoss()
+        self.init_parameters()
         self.init_optimizer()
     
     def init_parameters(self):
@@ -64,8 +68,26 @@ class PytorchChowder:
                 {'params': params_conv, 'weight_decay': 0.5},
                 {'params': params_others}
         ], lr=self.LR)
-        
-    def prepare_dataset(self, features_train, features_test, labels_train, labels_test):
+    
+    def get_model_metrics(self):
+        compute_weights_metrics(self.model)
+        xb, yb = next(self.valid_dataloader.__iter__())
+        compute_forward_metrics(self.model, xb)
+        compute_backward_metrics(self.model, self.loss_func, xb, yb)
+        metrics = OrderedDict()
+        for name, layer in self.model.named_children():
+            if hasattr(layer, 'my_metrics'):
+                metrics[name] = layer.my_metrics
+        return metrics
+
+    def prepare_dataset(self, ft_train_np, ft_test_np, lb_train_np, lb_test_np):
+        features_train = torch.Tensor(ft_train_np)
+        features_test = torch.Tensor(ft_test_np)
+        labels_train = torch.Tensor(lb_train_np).view(-1, 1, 1)
+        assert len(features_train) == len(labels_train)
+        labels_test = torch.Tensor(lb_test_np).view(-1, 1, 1)
+        assert len(features_test) == len(labels_test)
+
         self.train_dataset = TensorDataset(features_train, labels_train)
         self.train_dataloader = DataLoader(self.train_dataset, batch_size=self.BATCH_SIZE, shuffle=True) 
         self.valid_dataset = TensorDataset(features_test, labels_test)
@@ -88,17 +110,20 @@ class PytorchChowder:
             with torch.no_grad():
                 valid_loss = sum(self.loss_func(self.model(xb), yb) for xb, yb in self.valid_dataloader)
             
-            print("E : ", i, "loss : ", valid_loss / len(self.valid_dataset))
+            print("E :", i, "loss :", valid_loss.item() / len(self.valid_dataset))
 
     def save_model(self, path):    
         torch.save(self.model, path)
 
     def compute_predictions(self, data):
         self.model.eval()
+        data = torch.Tensor(data)
         with torch.no_grad():
             preds = nn.Sigmoid().forward(self.model(data).squeeze()).numpy()
+        assert np.max(preds) <= 1.0
+        assert np.min(preds) >= 0.0            
         preds[preds > 0.5] = 1
         preds[preds <= 0.5] = 0
-        assert np.max(preds) <= 1.0
-        assert np.min(preds) >= 0.0
-        return preds
+        return preds.astype(int)
+
+    
