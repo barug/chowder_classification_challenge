@@ -27,14 +27,13 @@ class WSIFilesHandler:
             padded_features = np.pad(patient_features, ((left_pad, right_pad), (0,0)), mode='constant', constant_values=(0,))
 
             padded_features = padded_features.transpose(1, 0)
-            
             features.append(padded_features)
 
         features = np.stack(features, axis=0)
         return features
 
 
-    def load_dataset(self):
+    def load_files(self):
         train_dir = self.data_dir / "train_input" / "resnet_features"
         test_dir = self.data_dir / "test_input"  / "resnet_features"
 
