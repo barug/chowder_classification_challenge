@@ -8,18 +8,20 @@ def compute_forward_metrics(model, xb):
     remove_handles = []
 
     def apply_hook(m):
-        def forward_metrics(m, input, output):
+        def forward_metrics(m, lay_input, output):
             act_metrics = {}
             act_metrics["min"] = output.min().item()
             act_metrics["max"] = output.max().item()
             act_metrics["mean"] = output.mean().item()
             act_metrics["std"] = output.std().item()
+            act_metrics["output"] = output
+            act_metrics["input"] = lay_input
             
             if not hasattr(m, 'my_metrics'):
                 m.my_metrics = {}
             m.my_metrics["forward"] = act_metrics
-        if isinstance(m, (nn.Conv1d, nn.Linear, nn.LeakyReLU)):
-            remove_handles.append(m.register_forward_hook(forward_metrics))
+        #if isinstance(m, (nn.Conv1d, nn.Linear, nn.LeakyReLU)):
+        remove_handles.append(m.register_forward_hook(forward_metrics))
 
     model.apply(apply_hook)
     with torch.no_grad():
