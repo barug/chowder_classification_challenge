@@ -7,10 +7,11 @@ import pandas as pd
 
 class WSIDataset:
 
-    def __init__(self, ids, features, meta, labels):
+    def __init__(self, ids, features, meta, paddings, labels):
         self.ids = ids
         self.features = features
         self.meta = meta
+        self.paddings = paddings
         self.labels = labels
 
 class WSIDataHandler:
@@ -20,12 +21,11 @@ class WSIDataHandler:
         self.data_dir = data_dir
         self.max_tiles_nbr = max_tiles_nbr
 
-        train_dir = self.data_dir / "train_input" / "resnet_features"
-        test_dir = self.data_dir / "test_input"  / "resnet_features"
+        train_dir = data_dir / "train_input" / "resnet_features"
+        test_dir = data_dir / "test_input"  / "resnet_features"
 
-        train_labels_filename = self.data_dir / "train_output.csv"
-        test_labels_filename = self.data_dir / "test_output.csv"
-        
+        train_labels_filename = data_dir / "train_output.csv"
+        test_labels_filename = data_dir / "test_output.csv"
         self.train_dataset = self._load_dataset(train_dir, train_labels_filename)
         self.test_dataset = self._load_dataset(test_dir, test_labels_filename)
 
@@ -35,14 +35,15 @@ class WSIDataHandler:
         for filename in filenames:
             assert filename.is_file(), filename
         ids = [f.stem for f in filenames]
-        features, meta = self._load_features(filenames)
+        features, meta, paddings = self._load_features(filenames)
         labels = labels["Target"].values
-        return WSIDataset(ids, features, meta, labels)
+        return WSIDataset(ids, features, meta, paddings, labels)
         
     def _load_features(self, filenames):
         # Load numpy arrays
         features = []
         meta = []
+        paddings = []
         for f in filenames:
             patient_features = np.load(f)
 
@@ -56,16 +57,29 @@ class WSIDataHandler:
             padded_res = padded_res.transpose(1, 0)
             features.append(padded_res)
             meta.append(padded_meta)
+            paddings.append((left_pad, right_pad))
         
         features = np.stack(features, axis = 0)
         meta = np.stack(meta, axis = 0)
-        return features, meta
+        paddings = np.stack(paddings, axis = 0)
+        return features, meta, paddings
 
+    def save_test_predictions(self, preds):
+        # Write the predictions in a csv file, to export them to the data challenge platform
+        test_output = pd.DataFrame({"ID": self.test_dataset.ids, "Target": preds})
+        test_output.set_index("ID", inplace=True)
+        test_output.to_csv(self.data_dir / "test_pytorch.csv")
 
-    # def save_test_predictions(self, preds):
-    #     # Write the predictions in a csv file, to export them to the data challenge platform
-    #     test_output = pd.DataFrame({"ID": self.ids_test, "Target": preds})
-    #     test_output.set_index("ID", inplace=True)
-    #     test_output.to_csv(self.data_dir / "test_pytorch.csv")
+    def aggregate_tiles_meta(self, scores):
+        scores_t = scores.transpose((0, 2, 1))
+        full_meta = np.append(self.test_dataset.meta, scores_t, axis=2)
+        meta_dict = {}
+        for i in range(full_meta.shape[0]):
+            patient_id = self.test_dataset.ids[i]
+            left_pad, right_pad = self.test_dataset.paddings[i]
+            p_res = full_meta[i, left_pad : 1000 - right_pad]
+            meta_dict[patient_id] = p_res
+        return meta_dict
+
 
 

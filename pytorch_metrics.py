@@ -1,6 +1,5 @@
 import torch 
 from torch import nn
-from sklearn import metrics
 
 
 def compute_forward_metrics(model, xb):
@@ -68,10 +67,4 @@ def compute_weights_metrics(model):
                 m.my_metrics = {}
             m.my_metrics['weights'] = weights_metrics
     model.apply(compute_lyr_weights)
-    
-
-def pred_metrics(labels_test, labels_pred):
-    labels_testset = labels_test.astype(int)
-    print("confusion matrix: \n" + str(metrics.confusion_matrix(labels_testset, labels_pred)))
-    print("accuracy : " + str(metrics.accuracy_score(labels_test, labels_pred)))
 
