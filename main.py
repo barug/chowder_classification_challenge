@@ -24,12 +24,15 @@ from my_metrics import pred_metrics
 
 #torch.set_printoptions(precision=10, threshold=100000)
 
-
 parser = argparse.ArgumentParser()
 parser.add_argument("--data_dir", required=True, type=Path,
-                    help="Data containing the lupus slides")
+                    help="Dataset location")
 parser.add_argument("--conf", required=True, type=Path,
                     help="Path of configuration file")
+parser.add_argument("--save_mod_dir", required=False, type=str,
+                    help="save models to dir")
+parser.add_argument("--save_res_to", required=False, type=str,
+                    help="save results to dir")
 
 
 if __name__ == "__main__":
@@ -42,22 +45,19 @@ if __name__ == "__main__":
     wsi_data = WSIDataHandler(args.data_dir, conf['mt'])
     
     ensemble = ChowderEnsembler(**conf)
-    ensemble.load_dataset(wsi_data.train_dataset)    
-    ensemble.train_models()
+    ensemble.train_models(wsi_data.train_dataset)
+    
     preds_test = ensemble.compute_predictions(wsi_data.test_dataset.features)
 
-    mtrcs = pred_metrics(wsi_data.test_dataset.labels, preds_test)
+    #mtrcs = pred_metrics(wsi_data.test_dataset.labels, preds_test)
 
     scores = ensemble.compute_tiles_scores(wsi_data.test_dataset.features)
     patients_meta = wsi_data.aggregate_tiles_meta(scores)
     
-    pickle.dump(patients_meta, open("results.p", "wb"))
-    
-    #np.save('results.npy', app_meta)
+    if args.save_mod_dir is not None:
+        ensemble.save_ensemble(args.save_mod_dir, args.data_dir)
+    if args.save_res_to is not None:
+        pickle.dump(patients_meta, open(args.save_res_to, "wb"))
 
     
     
-    #file_handler.save_test_predictions(preds_test)
-
-    # model_name = '{}_B{}_EP{}_LR{}_R{}.pt'.format(args.data_dir, BATCH_SIZE, EPOCHS, LEARNING_RATE, R)
-    # pt_chowder.save_model('models/{}'.format(model_name))

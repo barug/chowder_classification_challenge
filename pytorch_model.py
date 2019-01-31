@@ -9,6 +9,7 @@ from torch.utils.data import DataLoader
 from pytorch_metrics import compute_weights_metrics, compute_forward_metrics, compute_backward_metrics
 
 from collections import OrderedDict
+from pathlib import Path
 
 
 class MinMax(nn.Module):
@@ -81,14 +82,13 @@ class PytorchChowder:
                 metrics[name] = layer.my_metrics
         return metrics
 
-    def set_dataloaders(self, dataloader):
-        self.dataloader = dataloader
-        
-    def train_model(self):
+    def train_model(self, dataset):
         print("training model")
+
+        dataloader = DataLoader(dataset, batch_size=self.BATCH_SIZE, shuffle=True)
         for i in range(self.EPOCHS):
             self.model.train()
-            for xb, yb in self.dataloader:
+            for xb, yb in dataloader:
                 self.opt.zero_grad()
                 y_pred = self.model(xb)
                 loss = self.loss_func(y_pred, yb)
@@ -104,12 +104,14 @@ class PytorchChowder:
             #exit()
             self.model.eval()
             with torch.no_grad():
-                valid_loss = sum(self.loss_func(self.model(xb), yb) for xb, yb in self.dataloader)
+                valid_loss = sum(self.loss_func(self.model(xb), yb) for xb, yb in dataloader)
             
-            print("E :", i, "loss :", valid_loss.item() / len(self.dataloader.dataset))
+            print("E :", i, "loss :", valid_loss.item() / len(dataloader.dataset))
 
-    def save_model(self, path):    
-        torch.save(self.model, path)
+    def save_model(self, path, prefix):
+        self.model.eval()
+        model_name = '{}_B{}_EP{}_LR{}_R{}.pt'.format(prefix, self.BATCH_SIZE, self.EPOCHS, self.LR, self.R)
+        torch.save(self.model, path + "/" + model_name)
 
     def compute_predictions(self, data):
         self.model.eval()
@@ -132,39 +134,39 @@ class ChowderEnsembler:
 
     def __init__(self, n_models = 10, r = 5, bs = 10, ep = 30, lr = 0.001, mt = 1000, drp = 0.5):
         self.BATCH_SIZE = bs
-        self.ensemble = []
+        self.model_pool = []
         for i in range(n_models):
-            self.ensemble.append(PytorchChowder(r, bs, ep, lr, mt))
+            self.model_pool.append(PytorchChowder(r, bs, ep, lr, mt))
     
-    def load_dataset(self, dataset):
+    def train_models(self, dataset):
         features = torch.Tensor(dataset.features)
         labels = torch.Tensor(dataset.labels).view(-1, 1, 1)
         assert len(features) == len(labels)
         
         t_dataset = TensorDataset(features, labels)
         
-        for model in self.ensemble:
-            dataloader = DataLoader(t_dataset, batch_size=self.BATCH_SIZE, shuffle=True) 
-            model.set_dataloaders(dataloader)
-
-    def train_models(self):
-        for model in self.ensemble:
-            model.train_model()    
+        for model in self.model_pool:            
+            model.train_model(t_dataset)    
 
     def compute_predictions(self, data):
         preds = []
-        for model in self.ensemble:
+        for model in self.model_pool:
             pred = model.compute_predictions(data)
             preds.append(pred)
 
-        results = np.sum(preds, axis = 0) / len(self.ensemble)
+        results = np.sum(preds, axis = 0) / len(self.model_pool)
         return results
 
     def compute_tiles_scores(self, data):
         scores = []
-        for model in self.ensemble:
+        for model in self.model_pool:
             scr = model.compute_tiles_scores(data)
             scores.append(scr)
 
-        results = np.sum(scores, axis = 0) / len(self.ensemble)
+        results = np.sum(scores, axis = 0) / len(self.model_pool)
         return results
+    
+    def save_ensemble(self, save_dir, ens_prefix):
+        for i, model in enumerate(self.model_pool):
+            mod_prefix = "{}_M{}".format(ens_prefix, i)
+            model.save_model(save_dir, mod_prefix)
