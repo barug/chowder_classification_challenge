@@ -1,0 +1,7 @@
+n_models : 1
+r : 10
+bs : 10
+ep : 3
+lr : 0.001
+mt : 1000
+drp : 0
