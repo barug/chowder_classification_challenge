@@ -13,6 +13,7 @@ from pathlib import Path
 
 
 class MinMax(nn.Module):
+    """Implementation of the MinMax layer described in the Chowder paper"""
 
     def __init__(self, r):
         super(MinMax, self).__init__()
@@ -26,6 +27,7 @@ class MinMax(nn.Module):
 
 
 class PytorchChowder:
+    """Encapsulate a pytroch implementation of the Chowder algorithm"""
 
     def __init__(self, r = 5, bs = 10, ep = 30, lr = 0.001, mt = 1000, drp= 0.5 ):
         self.R = r
@@ -45,10 +47,8 @@ class PytorchChowder:
             ('sig2', nn.Sigmoid()),
             ('drop3', nn.Dropout(p = drp)),
             ('lin3', nn.Linear(100, 1))
-#            nn.Sigmoid()
         ])).float()
 
-        #loss_func = nn.BCEWithLogitsLoss(pos_weight=pos_ratio)
         self.loss_func = nn.BCEWithLogitsLoss()
         self.init_parameters()
         self.init_optimizer()
@@ -64,15 +64,16 @@ class PytorchChowder:
         self.model.apply(init_layer)
 
     def init_optimizer(self):
+        # init optimizer and apply L2 regularization to conv parameters
         params_conv = list(self.model[0].parameters())
         params_others = [param for layer in self.model[1:] for param in layer.parameters()]
-        # self.opt = optim.SGD(self.model.parameters(), lr=self.LR)
         self.opt = optim.Adam([
                 {'params': params_conv, 'weight_decay': 0.5},
                 {'params': params_others}
         ], lr=self.LR)
     
     def get_model_metrics(self, xb, yb):
+        # this method can be used to compute metrics on the weights, forward and backward pass of the model (see pytorch_metrics.py) 
         compute_weights_metrics(self.model)
         compute_forward_metrics(self.model, xb)
         compute_backward_metrics(self.model, self.loss_func, xb, yb)
@@ -84,7 +85,6 @@ class PytorchChowder:
 
     def train_model(self, dataset):
         print("training model")
-
         dataloader = DataLoader(dataset, batch_size=self.BATCH_SIZE, shuffle=True)
         for i in range(self.EPOCHS):
             self.model.train()
@@ -95,13 +95,8 @@ class PytorchChowder:
                 loss.backward()
 
                 self.opt.step()
-            compute_forward_metrics(self.model, xb)
             torch.set_printoptions(precision=10)
 
-            #print(self.model[0].my_metrics["forward"]["input"])
-            #print(self.model[0].my_metrics["forward"]["output"])
-            #print(self.model[1].my_metrics["forward"]["output"])
-            #exit()
             self.model.eval()
             with torch.no_grad():
                 valid_loss = sum(self.loss_func(self.model(xb), yb) for xb, yb in dataloader)
@@ -109,11 +104,13 @@ class PytorchChowder:
             print("E :", i, "loss :", valid_loss.item() / len(dataloader.dataset))
 
     def save_model(self, path, prefix):
+        # save model with name containing hyperparams
         self.model.eval()
         model_name = '{}_B{}_EP{}_LR{}_R{}.pt'.format(prefix, self.BATCH_SIZE, self.EPOCHS, self.LR, self.R)
         torch.save(self.model, path + "/" + model_name)
 
     def compute_predictions(self, data):
+        # compute class predictions
         self.model.eval()
         data = torch.Tensor(data)
         with torch.no_grad():
@@ -123,14 +120,18 @@ class PytorchChowder:
         return preds
 
     def compute_tiles_scores(self, data):
+        # compute tile tumor likelihood score
         self.model.eval()
         data = torch.Tensor(data)
         with torch.no_grad():
             scores = self.model[0].forward(data)
         return scores.numpy()
 
-    
+
+
+
 class ChowderEnsembler:
+    """ Encampsulate an ensemble of n_models of class PytorchChowder"""
 
     def __init__(self, n_models = 10, r = 5, bs = 10, ep = 30, lr = 0.001, mt = 1000, drp = 0.5):
         self.BATCH_SIZE = bs
@@ -138,6 +139,8 @@ class ChowderEnsembler:
         for i in range(n_models):
             self.model_pool.append(PytorchChowder(r, bs, ep, lr, mt))
     
+    # this class mainly iterate on the PytorchChowder class instances to execute the operations
+
     def train_models(self, dataset):
         features = torch.Tensor(dataset.features)
         labels = torch.Tensor(dataset.labels).view(-1, 1, 1)

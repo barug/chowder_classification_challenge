@@ -1,6 +1,11 @@
 import torch 
 from torch import nn
 
+"""This in an attempt at getting some insight on the weights, activations and gradients of the model"""
+
+# these methods create a new layer attribute my_metrics to store the computed value
+
+# the two next methods register hooks, execute a pass to get metrics and then remove the hooks  
 
 def compute_forward_metrics(model, xb):
     model.eval()
@@ -19,7 +24,6 @@ def compute_forward_metrics(model, xb):
             if not hasattr(m, 'my_metrics'):
                 m.my_metrics = {}
             m.my_metrics["forward"] = act_metrics
-        #if isinstance(m, (nn.Conv1d, nn.Linear, nn.LeakyReLU)):
         remove_handles.append(m.register_forward_hook(forward_metrics))
 
     model.apply(apply_hook)
@@ -57,7 +61,7 @@ def compute_backward_metrics(model, loss_func, xb, yb):
 
 def compute_weights_metrics(model):
     def compute_lyr_weights(m):
-        if isinstance(m, (nn.Conv1d, nn.Linear, nn.Sigmoid)):
+        if isinstance(m, (nn.Conv1d, nn.Linear)):
             weights_metrics = {}
             weights_metrics["min"] = m.weight.data.min().item()
             weights_metrics["max"] = m.weight.data.max().item()

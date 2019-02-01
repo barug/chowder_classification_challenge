@@ -10,6 +10,8 @@ class WSIDataset:
     
     def __init__(self, features_dir, labels_file, max_tiles_nbr):
         self.max_tiles_nbr = max_tiles_nbr
+
+        # load data
         labels = pd.read_csv(labels_file)
         filenames = [features_dir / "{}.npy".format(idx) for idx in labels["ID"]]
         for filename in filenames:
@@ -17,6 +19,7 @@ class WSIDataset:
         ids = [f.stem for f in filenames]
         features, meta, paddings = self._load_features(filenames)
         labels = labels["Target"].values
+
         self.ids = ids
         self.features = features
         self.meta = meta
@@ -31,18 +34,25 @@ class WSIDataset:
         for f in filenames:
             patient_features = np.load(f)
 
+            # this separate the data between features and metadata
             patient_res = patient_features[:, 3:]
             patient_meta = patient_features[:, :3]
+
+            # tiles are padded to reach a set number to be processed in batch
             pad_size = self.max_tiles_nbr - patient_res.shape[0]
             left_pad = pad_size // 2
             right_pad = pad_size // 2 + pad_size % 2
             padded_res = np.pad(patient_res, ((left_pad, right_pad), (0,0)), mode='constant', constant_values=(0,))
             padded_meta = np.pad(patient_meta, ((left_pad, right_pad), (0,0)), mode='constant', constant_values=(0,))
             padded_res = padded_res.transpose(1, 0)
+
             features.append(padded_res)
             meta.append(padded_meta)
+
+            # padding values are saved for padding removal
             paddings.append((left_pad, right_pad))
         
+        # data is concatenated in numpy array
         features = np.stack(features, axis = 0)
         meta = np.stack(meta, axis = 0)
         paddings = np.stack(paddings, axis = 0)
@@ -54,14 +64,20 @@ class WSIDataset:
         test_output.set_index("ID", inplace=True)
         test_output.to_csv(dest)
 
+
     def aggregate_results(self, preds, tiles_scores):
+        # the score of each tile is appended to its metadata
         scores_t = tiles_scores.transpose((0, 2, 1))
         full_meta = np.append(self.meta, scores_t, axis=2)
+
         results = {}
         for i in range(full_meta.shape[0]):
+            # padding is removed
             patient_id = self.ids[i]
             left_pad, right_pad = self.paddings[i]
             tiles_meta = full_meta[i, left_pad : 1000 - right_pad]
+
+            # results are loaded in dict
             results[patient_id] = {}
             results[patient_id]['prediction'] = preds[i]
             results[patient_id]['tiles'] = tiles_meta
