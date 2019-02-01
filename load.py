@@ -44,6 +44,8 @@ class WSIDataset:
             right_pad = pad_size // 2 + pad_size % 2
             padded_res = np.pad(patient_res, ((left_pad, right_pad), (0,0)), mode='constant', constant_values=(0,))
             padded_meta = np.pad(patient_meta, ((left_pad, right_pad), (0,0)), mode='constant', constant_values=(0,))
+
+            # transposition of the tiles features for each patient, This is required for the 1d convolutional layer 
             padded_res = padded_res.transpose(1, 0)
 
             features.append(padded_res)
@@ -66,8 +68,9 @@ class WSIDataset:
 
 
     def aggregate_results(self, preds, tiles_scores):
-        # the score of each tile is appended to its metadata
+        # the tiles data is transposed back to its original state
         scores_t = tiles_scores.transpose((0, 2, 1))
+        # the score of each tile is appended to its metadata
         full_meta = np.append(self.meta, scores_t, axis=2)
 
         results = {}
