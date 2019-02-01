@@ -26,8 +26,7 @@ options:
 - save_mod_dir : path of the directory where to save the models. optional
 - save_res_to : path of the result save file. optional
 
-after generating the result file, run the jupyter notebook named challenge_notebook.ipynb with the generated ipython kernel.
-This notebook contains a few cell that visualize the input and output data of the algorithm. 
+After generating the result file, run the jupyter notebook named challenge_notebook.ipynb with the generated ipython kernel. This notebook contains a few cells that visualize the input and output data of the algorithm.
 
 ## conclusion
 
