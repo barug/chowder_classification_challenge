@@ -1,5 +1,3 @@
-"""Train a baseline model, and make a prediction."""
-
 import argparse
 from pathlib import Path
 
@@ -18,7 +16,7 @@ from sklearn import metrics
 import pickle
 import yaml
 
-from load import WSIDataHandler
+from load import WSIDataset
 from pytorch_model import PytorchChowder, ChowderEnsembler
 from my_metrics import pred_metrics
 
@@ -42,22 +40,29 @@ if __name__ == "__main__":
     with args.conf.open() as conf_file:
         conf = yaml.load(conf_file)    
 
-    wsi_data = WSIDataHandler(args.data_dir, conf['mt'])
+    train_dir = args.data_dir / "train_input" / "resnet_features"
+    train_labels_filename = args.data_dir / "train_output.csv"
+    
+    train_dataset = WSIDataset(train_dir, train_labels_filename, conf['mt'])
+
+    test_dir = args.data_dir / "test_input"  / "resnet_features"
+    test_labels_filename = args.data_dir / "test_output.csv"
+
+    test_dataset = WSIDataset(test_dir, test_labels_filename, conf['mt'])    
+
+    #wsi_data = WSIDataHandler(args.data_dir, conf['mt'])
     
     ensemble = ChowderEnsembler(**conf)
-    ensemble.train_models(wsi_data.train_dataset)
+    ensemble.train_models(train_dataset)
     
-    preds_test = ensemble.compute_predictions(wsi_data.test_dataset.features)
+    preds_test = ensemble.compute_predictions(test_dataset.features)
 
     #mtrcs = pred_metrics(wsi_data.test_dataset.labels, preds_test)
 
-    scores = ensemble.compute_tiles_scores(wsi_data.test_dataset.features)
-    patients_meta = wsi_data.aggregate_tiles_meta(scores)
+    scores = ensemble.compute_tiles_scores(test_dataset.features)
+    patients_results = test_dataset.aggregate_results(preds_test, scores)
     
     if args.save_mod_dir is not None:
         ensemble.save_ensemble(args.save_mod_dir, args.data_dir)
     if args.save_res_to is not None:
-        pickle.dump(patients_meta, open(args.save_res_to, "wb"))
-
-    
-    
+        pickle.dump(patients_results, open(args.save_res_to, "wb"))
