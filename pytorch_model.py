@@ -128,8 +128,6 @@ class PytorchChowder:
         return scores.numpy()
 
 
-
-
 class ChowderEnsembler:
     """ Encampsulate an ensemble of n_models of class PytorchChowder"""
 

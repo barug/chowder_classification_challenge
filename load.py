@@ -54,7 +54,7 @@ class WSIDataset:
             # padding values are saved for padding removal
             paddings.append((left_pad, right_pad))
         
-        # data is concatenated in numpy array
+        # data is concatenated in numpy arrays
         features = np.stack(features, axis = 0)
         meta = np.stack(meta, axis = 0)
         paddings = np.stack(paddings, axis = 0)
