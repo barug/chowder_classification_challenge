@@ -1,15 +1,17 @@
 # Chowder_classification_challenge
 
+https://arxiv.org/pdf/1802.02212.pdf
+
 ## setup
 
 ```sh
-python3 -m venv venv_owkin_challenge
-source venv_owkin_challenge/bin/activate
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 ```
 to create an ipython kernel named owkin_challenge in your virtualenv, run from your virtualenv :
 ```sh
-ipython kernel install --user --name=owkin_challenge
+ipython kernel install --user --name=chowder_challenge
 ```
 
 ## usage
