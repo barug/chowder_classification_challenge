@@ -1,4 +1,4 @@
-# Owkin_challenge
+# Chowder_classification_challenge
 
 ## setup
 
