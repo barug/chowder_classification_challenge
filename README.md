@@ -9,7 +9,7 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
-to create an ipython kernel named owkin_challenge in your virtualenv, run from your virtualenv :
+to create an ipython kernel named chowder_challenge in your virtualenv, run from your virtualenv :
 ```sh
 ipython kernel install --user --name=chowder_challenge
 ```
