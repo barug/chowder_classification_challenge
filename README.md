@@ -1,7 +1,5 @@
 # Chowder_classification_challenge
 
-https://arxiv.org/pdf/1802.02212.pdf
-
 ## setup
 
 ```sh
